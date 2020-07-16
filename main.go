@@ -1,20 +1,25 @@
 package main
 
 import (
-	"fmt"
+	"html/template"
 	"net/http"
 )
-
+type ViewData struct {
+	Title string
+	Message string
+}
 func main(){
+	http.HandleFunc("/", func(writer http.ResponseWriter, request *http.Request) {
+		data := ViewData{
+			Title:   "World Cup",
+			Message: "Fifa",
+		}
 
-http.HandleFunc("/", func(writer http.ResponseWriter, request *http.Request) {
-	http.ServeFile(writer, request, "form.html")
-})
-http.HandleFunc("/postform", func(writer http.ResponseWriter, request *http.Request) {
-	name:= request.FormValue("username")
-	age:=request.FormValue("userage")
-
-	fmt.Fprintf(writer,"Name: %s Age: %s", name, age)
-})
-http.ListenAndServe("localhost:8181", nil)
+		tmpl := template.Must(template.New("data").Parse(`<div> 
+    <h1> {{ .Title}}</h1>
+     <p>{{ .Message}}</p>
+      </div>`))
+		tmpl.Execute(writer, data)
+	})
+	http.ListenAndServe("localhost:8181", nil)
 }
