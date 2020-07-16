@@ -2,19 +2,27 @@ package main
 
 import (
 	"fmt"
+	"github.com/gorilla/mux"
 	"net/http"
 )
 
+func productsHandler( writer http.ResponseWriter, request *http.Request){
+	vars := mux.Vars(request)
+	id:=vars["id"]
+	cat:= vars["cat"]
+	response:=fmt.Sprintf("Product category=%s id=%s", cat, id)
+	fmt.Fprint(writer, response)
+}
+
+func indexHandler(writer http.ResponseWriter, request *http.Request){
+	fmt.Fprint(writer, "Index")
+}
 func main(){
 
-	fs:=http.FileServer(http.Dir("static"))
-	http.Handle("/", fs)
-
-	http.HandleFunc("/about", func(writer http.ResponseWriter, request *http.Request) {
-		http.ServeFile(writer, request, "static/about.html")
-	})
-	http.HandleFunc("/contact", func(writer http.ResponseWriter, request *http.Request) {
-		fmt.Fprint(writer, "Contatc")
-	})
-	http.ListenAndServe("localhost:8181", nil)
+	router:= mux.NewRouter()
+    router.HandleFunc("/products/category/{id:[0-9]+}", productsHandler)
+	router.HandleFunc("/articles/{id:[0-9]}", productsHandler)
+	router.HandleFunc("/", indexHandler)
+	http.Handle("/", router)
+    http.ListenAndServe("localhost:8181", nil)
 }
