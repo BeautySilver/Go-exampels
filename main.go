@@ -1,17 +1,31 @@
 package main
 
-import(
+import (
 	"fmt"
 	"net/http"
 )
-type msg string
-
-func (m msg) ServeHTTP(resp http.ResponseWriter, req *http.Request){
-	fmt.Fprint(resp, m)
+type httpHandler struct {
+	message string
 }
 
+func (h httpHandler) ServeHTTP(resp http.ResponseWriter, req *http.Request){
+	fmt.Fprint(resp, h.message)
+}
 func main(){
-	msgHandler := msg ("Hello from Web Server in Go")
-	fmt.Println("Server is listening ...")
-	http.ListenAndServe("localhost:8181", msgHandler)
+
+	h1:=httpHandler{message:"Conact"}
+
+	http.Handle("/contact", h1)
+
+	http.HandleFunc("/about", func(writer http.ResponseWriter, request *http.Request){
+		fmt.Fprint(writer, "About")
+	})
+	http.HandleFunc("/contct", func(writer http.ResponseWriter, request *http.Request) {
+		fmt.Fprint(writer, "Contact")
+	})
+	http.HandleFunc("/", func(writer http.ResponseWriter, request *http.Request) {
+		http.ServeFile(writer, request, "index.html")
+	})
+	fmt.Println("Listening")
+	http.ListenAndServe("localhost:8181", nil)
 }
