@@ -1,25 +1,131 @@
 package main
-
 import (
+	"database/sql"
+	"fmt"
+	_ "github.com/go-sql-driver/mysql"
+	"github.com/gorilla/mux"
 	"html/template"
+	"log"
 	"net/http"
 )
-type ViewData struct {
-	Title string
-	Message string
+type Product struct{
+	Id int
+	Model string
+	Company string
+	Price int
 }
-func main(){
-	http.HandleFunc("/", func(writer http.ResponseWriter, request *http.Request) {
-		data := ViewData{
-			Title:   "World Cup",
-			Message: "Fifa",
+var database *sql.DB
+
+func CreateHandler ( w http.ResponseWriter, r *http.Request){
+	if r.Method == "POST"{
+
+		err:= r.ParseForm()
+		if err != nil {
+			log.Println(err)
 		}
 
-		tmpl := template.Must(template.New("data").Parse(`<div> 
-    <h1> {{ .Title}}</h1>
-     <p>{{ .Message}}</p>
-      </div>`))
-		tmpl.Execute(writer, data)
-	})
-	http.ListenAndServe("localhost:8181", nil)
+		model := r.FormValue("model")
+		company := r.FormValue("company")
+		price := r.FormValue("price")
+
+		_, err = database.Exec("insert into productdb.Products (model, company, price) values(?, ?, ?)", model, company, price)
+		if err != nil{
+			log.Println(err)
+		}
+		http.Redirect(w, r, "/", 301)
+	}else{
+		http.ServeFile(w,r,"pages/create.html")
+	}
+}
+
+func EditPage (w http.ResponseWriter, r *http.Request){
+	vars := mux.Vars(r)
+	id := vars["id"]
+
+	row:=database.QueryRow("select * from productdb.Products where id =?", id)
+	prod:=Product{}
+	err := row.Scan(&prod.Id, &prod.Model, &prod.Model, &prod.Company, &prod.Price)
+
+	if err!= nil {
+		log.Println(err)
+		http.Error(w, http.StatusText(404), http.StatusNotFound)
+	}else{
+		tmpl, _ := template.ParseFiles("pages/edit.html")
+		tmpl.Execute(w, prod)
+	}
+}
+
+func EditHandler ( w http.ResponseWriter, r *http.Request){
+	err := r.ParseForm()
+	if err != nil {
+		log.Println(err)
+	}
+	id := r.FormValue("id")
+	model:=r.FormValue("model")
+	company := r.FormValue("company")
+	price := r.FormValue("price")
+
+	_, err = database.Exec("update productdb.Products set model=?, company=?, price =? where id =?", model, company, price, id)
+
+	if err !=nil{
+		log.Println(err)
+	}
+	http.Redirect(w,r,"/", 301)
+}
+
+func DeleteHandler (w http.ResponseWriter, r *http.Request){
+	vars:= mux.Vars(r)
+	id:=vars["id"]
+
+	_, err := database.Exec("delete from productdb.Products where id=?", id)
+	if err != nil{
+		log.Println(err)
+	}
+	http.Redirect(w,r,"/", 301)
+
+}
+
+func IndexHandler(w http.ResponseWriter, r *http.Request) {
+
+	rows, err := database.Query("select * from productdb.Products")
+	if err != nil {
+		log.Println(err)
+	}
+	defer rows.Close()
+	products := []Product{}
+
+	for rows.Next(){
+		p := Product{}
+		err := rows.Scan(&p.Id, &p.Model, &p.Company, &p.Price)
+		if err != nil{
+			fmt.Println(err)
+			continue
+		}
+		products = append(products, p)
+	}
+
+	tmpl, _ := template.ParseFiles("pages/form.html")
+	tmpl.Execute(w, products)
+}
+
+func main() {
+
+	db, err := sql.Open("mysql", "root:S233kaas17102001@tcp(127.0.0.1:3306)/productdb")
+
+	if err != nil {
+		log.Println(err)
+	}
+	database = db
+	defer db.Close()
+	router := mux.NewRouter()
+	router.HandleFunc("/", IndexHandler)
+	router.HandleFunc("create", CreateHandler)
+	router.HandleFunc("/edit/{id:[0-9]+}", EditPage).Methods("GET")
+	router.HandleFunc("/edit/{id:[0-9]+}", EditHandler).Methods("POST")
+	router.HandleFunc("/delete/{id:[0-9]+}", DeleteHandler)
+
+	http.Handle("/", router)
+
+	fmt.Println("Server is listening...")
+	http.ListenAndServe(":8181", nil)
 }
